@@ -1,0 +1,137 @@
+
+.app-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 48px 40px;
+  background: var(--card-green);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.login-card h1 {
+  font-family: 'Silkscreen', sans-serif;
+  font-size: 27px;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--text-main);
+  margin: 0 0 12px;
+}
+
+.login-card h2 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0 0 32px;
+}
+
+.login-card p {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text-secondary);
+}
+
+.login-options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-button,
+.back-button {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 9px;
+  border: 1px solid #718477;
+  background: var(--button-bg);
+  color: var(--text-main);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.login-button:hover,
+.back-button:hover {
+  background: #617968;
+  transform: translateY(-2px);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+.google-button {
+  background: #E6E9DF;
+  color: #29392F;
+  border-color: transparent;
+}
+
+.google-button:hover {
+  background: #F4F5EE;
+}
+
+.email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.email-form input {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #718477;
+  border-radius: 9px;
+  background: var(--input-bg);
+  color: var(--text-main);
+  outline: none;
+  font-size: 14px;
+}
+
+.email-form input::placeholder {
+  color: #A0ADA2;
+}
+
+.email-form input:focus {
+  border-color: var(--accent);
+}
+
+.back-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.error-message {
+  color: #F0A5A0 !important;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 38px 24px;
+  }
+
+  .login-card h1 {
+    font-size: 22px;
+  }
+}

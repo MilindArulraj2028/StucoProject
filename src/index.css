@@ -1,0 +1,39 @@
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap');
+
+:root {
+  --background: #080B09;
+  --card-green: #394B40;
+  --card-border: #536658;
+  --text-main: #E6E9DF;
+  --text-secondary: #B8C2B6;
+  --accent: #A5B99F;
+  --input-bg: #29392F;
+  --button-bg: #506657;
+
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text-main);
+  background: var(--background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+}
+
+button, input {
+  font: inherit;
+}
