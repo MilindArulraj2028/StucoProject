@@ -135,6 +135,7 @@ function App() {
   // Student conversations
   const [studentMessages, setStudentMessages] = useState([]);
   const [studentReplies, setStudentReplies] = useState({});
+  const [studentReplyDrafts, setStudentReplyDrafts] = useState({});
   const [selectedThread, setSelectedThread] = useState(null);
   const [studentMessagesLoading, setStudentMessagesLoading] = useState(true);
 
@@ -143,6 +144,7 @@ function App() {
   const [inboxLoading, setInboxLoading] = useState(true);
   const [selectedAdminMessage, setSelectedAdminMessage] = useState(null);
   const [adminReply, setAdminReply] = useState("");
+  const [adminThreadReplies, setAdminThreadReplies] = useState([]);
 
   // Announcements
   const [announcements, setAnnouncements] = useState([]);
@@ -327,6 +329,7 @@ function App() {
         batch.set(privateMessageRef, {
           channel: selectedChannel,
           subject: subject.trim(),
+          body: messageBody.trim(),
           createdAt: serverTimestamp()
         });
       });
@@ -422,6 +425,36 @@ function App() {
   }, [user, isAdmin, studentMessages]);
 
   // --------------------------------------------------
+  // STUDENT: REPLY IN THEIR CONVERSATION
+  // --------------------------------------------------
+
+  async function handleStudentReply(e, message) {
+    e.preventDefault();
+    const body = studentReplyDrafts[message.id]?.trim();
+    if (!body) return;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      await addDoc(
+        collection(db, "messages", message.id, "replies"),
+        {
+          body,
+          sender: "student",
+          createdAt: serverTimestamp()
+        }
+      );
+      setStudentReplyDrafts((previous) => ({ ...previous, [message.id]: "" }));
+    } catch (err) {
+      console.error("Student reply failed:", err);
+      setError("Your message could not be sent. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // --------------------------------------------------
   // ADMIN: LOAD INBOX
   // --------------------------------------------------
 
@@ -457,6 +490,26 @@ function App() {
     return () => unsubscribe();
   }, [user, isAdmin, page]);
 
+  // Keep the selected administrator conversation live as replies arrive.
+  useEffect(() => {
+    if (!selectedAdminMessage) {
+      setAdminThreadReplies([]);
+      return;
+    }
+
+    const repliesQuery = query(
+      collection(db, "messages", selectedAdminMessage.id, "replies"),
+      orderBy("createdAt", "asc")
+    );
+
+    return onSnapshot(repliesQuery, (snapshot) => {
+      setAdminThreadReplies(snapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data()
+      })));
+    }, (err) => console.error("Conversation loading failed:", err));
+  }, [selectedAdminMessage]);
+
   // --------------------------------------------------
   // ADMIN: REPLY TO STUDENT
   // --------------------------------------------------
@@ -479,12 +532,12 @@ function App() {
         ),
         {
           body: adminReply.trim(),
+          sender: "admin",
           createdAt: serverTimestamp()
         }
       );
 
       setAdminReply("");
-      setSelectedAdminMessage(null);
       setNotice("Reply sent successfully.");
 
     } catch (err) {
@@ -1001,36 +1054,50 @@ function App() {
                             )}
                           >
                             {selectedThread === item.id
-                              ? "HIDE CONVERSATION ↑"
-                              : `VIEW REPLIES (${replies.length}) ↓`}
+                              ? "CLOSE CONVERSATION ↑"
+                              : `OPEN CHAT (${replies.length} REPLIES) ↓`}
                           </button>
 
                           {selectedThread === item.id && (
-                            <div className="reply-list">
+                            <div className="chat-panel">
+                              <div className="chat-message student-chat-message">
+                                <span className="chat-sender">YOU · ORIGINAL MESSAGE</span>
+                                <p>{item.body || "Original message text is unavailable for this older submission."}</p>
+                                <span className="chat-time">{formatDate(item.createdAt)}</span>
+                              </div>
 
-                              {replies.length === 0 ? (
-                                <p className="no-replies">
-                                  No replies yet.
-                                </p>
-                              ) : (
-                                replies.map((reply) => (
-                                  <div
-                                    className="reply-card"
-                                    key={reply.id}
-                                  >
-                                    <span className="reply-label">
-                                      ADMINISTRATOR REPLY
-                                    </span>
+                              {replies.map((reply) => (
+                                <div
+                                  className={`chat-message ${reply.sender === "student" ? "student-chat-message" : "admin-chat-message"}`}
+                                  key={reply.id}
+                                >
+                                  <span className="chat-sender">
+                                    {reply.sender === "student" ? "YOU" : "STUCO TEAM"}
+                                  </span>
+                                  <p>{reply.body}</p>
+                                  <span className="chat-time">{formatDate(reply.createdAt)}</span>
+                                </div>
+                              ))}
 
-                                    <p>{reply.body}</p>
-
-                                    <span className="message-date">
-                                      {formatDate(reply.createdAt)}
-                                    </span>
-                                  </div>
-                                ))
-                              )}
-
+                              <form
+                                className="chat-compose"
+                                onSubmit={(e) => handleStudentReply(e, item)}
+                              >
+                                <textarea
+                                  placeholder="Write a message..."
+                                  value={studentReplyDrafts[item.id] || ""}
+                                  onChange={(e) => setStudentReplyDrafts((previous) => ({
+                                    ...previous,
+                                    [item.id]: e.target.value
+                                  }))}
+                                  rows={2}
+                                  maxLength={5000}
+                                  required
+                                />
+                                <button type="submit" className="primary-button" disabled={busy}>
+                                  {busy ? "SENDING..." : "SEND MESSAGE"}
+                                </button>
+                              </form>
                             </div>
                           )}
 
@@ -1111,7 +1178,7 @@ function App() {
                             setError("");
                           }}
                         >
-                          REPLY TO MESSAGE →
+                          OPEN CONVERSATION →
                         </button>
 
                       </article>
@@ -1149,33 +1216,39 @@ function App() {
 
                   <h2>{selectedAdminMessage.subject}</h2>
 
-                  <p className="message-body">
-                    {selectedAdminMessage.body}
-                  </p>
+                  <div className="chat-panel admin-chat-panel">
+                    <div className="chat-message admin-chat-message">
+                      <span className="chat-sender">STUDENT · ANONYMOUS</span>
+                      <p>{selectedAdminMessage.body}</p>
+                      <span className="chat-time">{formatDate(selectedAdminMessage.createdAt)}</span>
+                    </div>
 
-                  <form
-                    className="email-form"
-                    onSubmit={handleAdminReply}
-                  >
+                    {adminThreadReplies.map((reply) => (
+                      <div
+                        className={`chat-message ${reply.sender === "admin" ? "admin-chat-message" : "student-chat-message"}`}
+                        key={reply.id}
+                      >
+                        <span className="chat-sender">
+                          {reply.sender === "admin" ? "YOU · STUCO TEAM" : "STUDENT · ANONYMOUS"}
+                        </span>
+                        <p>{reply.body}</p>
+                        <span className="chat-time">{formatDate(reply.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
 
+                  <form className="chat-compose" onSubmit={handleAdminReply}>
                     <textarea
-                      className="message-input"
-                      placeholder="Write your reply..."
+                      placeholder="Write a message..."
                       value={adminReply}
                       onChange={(e) => setAdminReply(e.target.value)}
-                      rows={5}
+                      rows={2}
                       maxLength={5000}
                       required
                     />
-
-                    <button
-                      type="submit"
-                      className="primary-button"
-                      disabled={busy}
-                    >
-                      {busy ? "SENDING..." : "SEND REPLY"}
+                    <button type="submit" className="primary-button" disabled={busy}>
+                      {busy ? "SENDING..." : "SEND MESSAGE"}
                     </button>
-
                   </form>
 
                   <button
@@ -1929,7 +2002,7 @@ footer {
 }
 
 .thread-button:hover {
-  background: #465B70;
+  background: #394B40;
 }
 
 .reply-list {
@@ -1941,7 +2014,7 @@ footer {
 
 .reply-card {
   padding: 14px;
-  background: #35475B;
+  background: #394B40;
   border-radius: 5px;
 }
 
@@ -1957,6 +2030,92 @@ footer {
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding: 14px;
+  background: #26372D;
+  border: 1px solid #526458;
+  border-radius: 6px;
+}
+
+.chat-message {
+  width: fit-content;
+  max-width: 88%;
+  padding: 11px 13px;
+  border-radius: 8px;
+  color: #26372D;
+  background: #DCE8D5;
+  overflow-wrap: anywhere;
+}
+
+.student-chat-message {
+  align-self: flex-end;
+  background: #C8DCC0;
+}
+
+.admin-chat-message {
+  align-self: flex-start;
+  background: #E2EBDD;
+}
+
+.chat-sender {
+  display: block;
+  color: #526B54;
+  font-family: 'Silkscreen', sans-serif;
+  font-size: 8px;
+  line-height: 1.7;
+}
+
+.chat-message p {
+  margin: 5px 0;
+  color: #26372D;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.chat-time {
+  display: block;
+  color: #61745F;
+  font-size: 9px;
+  text-align: right;
+}
+
+.chat-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.chat-compose textarea {
+  width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #829783;
+  border-radius: 5px;
+  outline: none;
+  background: #E2EBDD;
+  color: #26372D;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.chat-compose textarea::placeholder {
+  color: #71816F;
+}
+
+.chat-compose .primary-button {
+  align-self: flex-end;
 }
 
 .no-replies {
