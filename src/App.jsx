@@ -2240,7 +2240,6 @@ footer {
     font-size: 8px;
   }
 
-
   .option-content strong {
     font-size: 12px;
   }
