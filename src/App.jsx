@@ -128,7 +128,7 @@ function App() {
   const [notice, setNotice] = useState("");
 
   // Student message form
-  const [channel, setChannel] = useState(CHANNELS[0]);
+  const [selectedChannels, setSelectedChannels] = useState([CHANNELS[0]]);
   const [subject, setSubject] = useState("");
   const [messageBody, setMessageBody] = useState("");
 
@@ -286,7 +286,15 @@ function App() {
   async function handleMessageSubmit(e) {
     e.preventDefault();
 
-    if (!user || !subject.trim() || !messageBody.trim()) return;
+    if (
+      !user ||
+      !subject.trim() ||
+      !messageBody.trim() ||
+      selectedChannels.length === 0
+    ) {
+      setError("Please choose at least one channel and complete your message.");
+      return;
+    }
 
     setError("");
     setNotice("");
@@ -295,40 +303,45 @@ function App() {
     try {
       const batch = writeBatch(db);
 
-      // Public-to-admin message content.
-      // No student UID or email is stored here.
-      const messageRef = doc(collection(db, "messages"));
+      // Create a separate anonymous message for each selected channel.
+      // No student UID or email is stored in the public message documents.
+      selectedChannels.forEach((selectedChannel) => {
+        const messageRef = doc(collection(db, "messages"));
 
-      batch.set(messageRef, {
-        channel,
-        subject: subject.trim(),
-        body: messageBody.trim(),
-        createdAt: serverTimestamp()
-      });
+        batch.set(messageRef, {
+          channel: selectedChannel,
+          subject: subject.trim(),
+          body: messageBody.trim(),
+          createdAt: serverTimestamp()
+        });
 
-      // Private routing record, accessible only to this student.
-      // This allows the student to retrieve replies later.
-      const privateMessageRef = doc(
-        db,
-        "users",
-        user.uid,
-        "submittedMessages",
-        messageRef.id
-      );
+        // Private routing record lets this student retrieve replies.
+        const privateMessageRef = doc(
+          db,
+          "users",
+          user.uid,
+          "submittedMessages",
+          messageRef.id
+        );
 
-      batch.set(privateMessageRef, {
-        channel,
-        subject: subject.trim(),
-        createdAt: serverTimestamp()
+        batch.set(privateMessageRef, {
+          channel: selectedChannel,
+          subject: subject.trim(),
+          createdAt: serverTimestamp()
+        });
       });
 
       await batch.commit();
 
       setSubject("");
       setMessageBody("");
-      setChannel(CHANNELS[0]);
+      setSelectedChannels([CHANNELS[0]]);
       setPage("dashboard");
-      setNotice("Your anonymous message has been sent.");
+      setNotice(
+        selectedChannels.length === 1
+          ? `Your anonymous message has been sent to ${selectedChannels[0]}.`
+          : "Your anonymous message has been sent to both channels."
+      );
 
     } catch (err) {
       console.error("Message submission failed:", err);
@@ -866,16 +879,29 @@ function App() {
 
                   <label>Send to</label>
 
-                  <select
-                    value={channel}
-                    onChange={(e) => setChannel(e.target.value)}
-                  >
+                  <div className="channel-options">
                     {CHANNELS.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
+                      <label className="channel-option" key={item}>
+                        <input
+                          className="channel-checkbox"
+                          type="checkbox"
+                          checked={selectedChannels.includes(item)}
+                          onChange={(e) => {
+                            setSelectedChannels((previous) =>
+                              e.target.checked
+                                ? [...previous, item]
+                                : previous.filter((selected) => selected !== item)
+                            );
+                          }}
+                        />
+                        <span>{item}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
+
+                  <p className="privacy-note">
+                    Select one channel or both. If you select both, your message will be delivered separately to each team.
+                  </p>
 
                   <label>Subject</label>
 
@@ -1584,6 +1610,44 @@ h2 {
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: -5px;
+}
+
+.channel-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.email-form .channel-option {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0;
+  padding: 13px 15px;
+  border: 1px solid #526458;
+  border-radius: 5px;
+  background: #263440;
+  color: #F2EDE5;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.email-form .channel-option:has(.channel-checkbox:checked) {
+  border-color: #A5B99F;
+  background: #2D4038;
+}
+
+.email-form .channel-checkbox {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin: 0;
+  padding: 0;
+  accent-color: #A5B99F;
+  cursor: pointer;
 }
 
 input,
